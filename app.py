@@ -177,7 +177,7 @@ fig.update_layout(
         overlaying='y',
         side='right',
         showgrid=False,
-        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.1]
+        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.25]
     ),
     barmode='group',
     hovermode='x unified',
