@@ -158,7 +158,7 @@ fig.add_trace(go.Scatter(
     y=property_vals,
     mode='lines+markers',
     name='Estimated Property Value (₹)',
-    line=dict(color='blue', width=3),
+    line=dict(color='white', width=3),
     hovertemplate="Year %{x}: ₹%{y:,.0f}<extra></extra>"
 ))
 
@@ -179,7 +179,7 @@ fig.update_layout(
     xaxis_title="Year",
     yaxis=dict(
         title="Property Value & Disbursements (₹)",
-        tickfont=dict(color='blue'),
+        tickfont=dict(color='white'),
         side='left',
         showgrid=False
     ),
