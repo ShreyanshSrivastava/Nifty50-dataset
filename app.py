@@ -74,7 +74,7 @@ else:
 down_payment_amt = property_price * down_payment_pct / 100
 loan_amt = property_price - down_payment_amt
 monthly_interest_rate = loan_interest_rate / 12 / 100
-months = loan_tenure_years * 12
+months = loan_tenure_yrs * 12
 
 # EMI calculation
 emi = npf.pmt(monthly_interest_rate, months, -loan_amt)
