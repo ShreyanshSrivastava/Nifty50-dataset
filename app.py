@@ -61,7 +61,7 @@ for tranche in payment_plan:
         loan_part = amount - remaining_equity
         remaining_equity = 0
         disbursement_month = tranche["month"]
-        emi = np.pmt(interest_rate / 12, loan_tenure_years * 12, -loan_part)
+        emi = npf.pmt(interest_rate / 12, loan_tenure_years * 12, -loan_part)
         emi_schedule.append({"month": disbursement_month, "emi": emi, "principal": loan_part})
 
 # Add EMIs to cashflow
