@@ -341,7 +341,7 @@ def build_staggered_loan_schedule(payment_schedule, annual_rate=0.086, tenure_ye
         amount = drawdown['amount']
         r = annual_rate / 12
         n = tenure_years * 12
-        emi = np.pmt(r, n, -amount)
+        emi = npf.pmt(r, n, -amount)
 
         for i in range(n):
             payment_date = start + relativedelta(months=i)
@@ -407,7 +407,7 @@ if st.sidebar.checkbox("Enable Custom Payment Schedule"):
 
             # IRR Calculation
             cashflows = cashflow_df['net_cashflow'].values
-            irr = np.irr(cashflows)
+            irr = npf.irr(cashflows)
 
             st.subheader("📊 Staggered Outflow Schedule")
             st.dataframe(pd.DataFrame(payment_schedule))
