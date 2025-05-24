@@ -117,7 +117,7 @@ fig.update_layout(
         tickfont=dict(color='green'),
         overlaying='y',
         side='right',
-        ange=[min(net_rent_vals)*0.9, max(net_rent_vals)*2.5]
+        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*2.5]
     ),
     hovermode='x unified',
     height=500,
