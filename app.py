@@ -122,7 +122,7 @@ fig.update_layout(
         overlaying='y',
         side='right',
         showgrid=False,
-        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.75]
+        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.25]
     ),
     hovermode='x unified',
     height=500,
