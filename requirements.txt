@@ -1,5 +1,6 @@
 streamlit
-pandas
 numpy
+pandas
 matplotlib
+plotly
 numpy-financial
