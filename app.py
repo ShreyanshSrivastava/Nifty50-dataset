@@ -228,4 +228,4 @@ cashflow_table = pd.DataFrame({
     "Net Rent (₹)": net_rent_vals,
     "Property Value (₹)": property_vals
 })
-st.dataframe(cashflow_table.style.format({"Net Rent (₹)": "₹{:.0f}", "Property Value (₹)": "₹{:.0f
+st.dataframe(cashflow_table.style.format({"Net Rent (₹)": "₹{:.0f}", "Property Value (₹)": "₹{:.0f}"}), use_container_width=True)
