@@ -5,6 +5,7 @@ from datetime import datetime
 from math import pow
 import matplotlib.pyplot as plt
 from io import BytesIO
+import numpy_financial as npf 
 
 st.set_page_config(page_title="NRI Investment Analyzer", layout="centered")
 st.title("🏘️ NRI Investment Analyzer")
@@ -51,7 +52,7 @@ cashflows = [-down_payment_amt]
 for i in range(1, horizon_years + 1):
     cashflows.append(net_rent_annual)
 cashflows[-1] += final_property_value
-irr = np.irr(cashflows)
+irr = npf.irr(cashflows)
 
 # --- Output Display ---
 st.subheader("📈 Investment Summary")
