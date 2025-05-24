@@ -36,7 +36,7 @@ if property_type == "Under-construction":
 
     # Allow user to input custom payment schedule and timing
     st.sidebar.markdown("### Payment Schedule Setup")
-    default_schedule = "10:20:30:40"
+    default_schedule = "10,20,30,40"
     payment_schedule_str = st.sidebar.text_input(
         "Enter Payment % splits (comma separated)", default_schedule
     )
