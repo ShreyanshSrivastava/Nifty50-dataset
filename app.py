@@ -66,27 +66,23 @@ cashflows.append(net_rent_vals[-1] + final_property_value)
 irr = npf.irr(cashflows)
 
 # --- Enhanced Dashboard Output ---
-
 st.subheader("📈 Investment Summary")
 
 col1, col2, col3, col4 = st.columns(4)
-
 col1.metric("Monthly EMI (₹)", f"{emi_rounded:,}")
 col2.metric("Gross Rental Yield (%)", f"{rent_annual / property_price * 100:.2f}")
 col3.metric("Net Rental Yield (%)", f"{net_rent_annual / property_price * 100:.2f}")
-col4.metric(f"Investment Horizon (yrs)", f"{horizon_years}")
+col4.metric("Investment Horizon (yrs)", f"{horizon_years}")
 
 col5, col6, col7, col8 = st.columns(4)
+col5.metric("Est. Property Value (₹)", f"{final_property_value:,.0f}")
+col6.metric("Total Net Rent (₹)", f"{net_rent_total:,.0f}")
+col7.metric("Total Outflow (₹)", f"{(total_outflow + interest_paid):,.0f}")
+col8.metric("Net Profit (₹)", f"{net_profit:,.0f}")
 
-col5.metric(f"Estimated Property Value (₹)", f"{final_property_value:,.0f}")
-col6.metric(f"Total Net Rent Earned (₹)", f"{net_rent_total:,.0f}")
-col7.metric(f"Total Outflow (₹)", f"{(total_outflow + interest_paid):,.0f}")
-col8.metric(f"Net Profit (₹)", f"{net_profit:,.0f}")
+st.markdown(f"**📊 Internal Rate of Return (IRR):** `{irr * 100:.2f}%`")
 
-st.markdown(f"**Internal Rate of Return (IRR):** {irr * 100:.2f}%")
-
-# --- Interactive Graph with Plotly ---
-
+# --- Interactive Graph with Dual Y-Axis ---
 years = list(range(1, horizon_years + 1))
 
 fig = go.Figure()
@@ -96,10 +92,9 @@ fig.add_trace(go.Bar(
     y=net_rent_vals,
     name="Net Rent (Annual ₹)",
     marker_color='green',
+    yaxis='y2',
     hovertemplate="Year %{x}: ₹%{y:,.0f}<extra></extra>"
 ))
-# Assign bar trace to secondary y-axis explicitly:
-fig.data[0].update(yaxis='y2')
 
 fig.add_trace(go.Scatter(
     x=years,
@@ -123,10 +118,8 @@ fig.update_layout(
         overlaying='y',
         side='right'
     ),
-    ),
-    barmode='group',
     hovermode='x unified',
-    height=450,
+    height=500,
     legend=dict(y=0.95, x=0.01)
 )
 
