@@ -8,7 +8,7 @@ from io import BytesIO
 import numpy_financial as npf 
 
 st.set_page_config(page_title="NRI Investment Analyzer", layout="centered")
-st.title("🏘️ NRI Investment Analyzer")
+st.title("🏘️ Real Estate Investment Analysis Tool")
 
 st.markdown("""
 This tool helps you analyze residential property investments — for both ready-to-move and under-construction projects.
@@ -79,4 +79,4 @@ ax.set_title("Annual Cashflow including Final Exit")
 st.pyplot(fig)
 
 # --- Footer ---
-st.caption("Built for NRI and domestic investors to analyze residential real estate with data-driven metrics. 🧮")
+st.caption("Built for real estate investors to analyze residential real estate with data-driven metrics. 🧮")
