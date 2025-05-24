@@ -52,7 +52,7 @@ def generate_amortization(loan, rate, tenure_years, freq="Monthly"):
     schedule = []
     periods = tenure_years * 12 if freq == "Monthly" else tenure_years
     r = rate / 1200 if freq == "Monthly" else rate / 100
-    emi = np.pmt(r, periods, -loan)
+    emi = npf.pmt(r, periods, -loan)
     balance = loan
     for i in range(1, periods + 1):
         interest = balance * r
