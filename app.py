@@ -96,9 +96,10 @@ fig.add_trace(go.Bar(
     y=net_rent_vals,
     name="Net Rent (Annual ₹)",
     marker_color='green',
-    yaxis="y2",
     hovertemplate="Year %{x}: ₹%{y:,.0f}<extra></extra>"
 ))
+# Assign bar trace to secondary y-axis explicitly:
+fig.data[0].update(yaxis='y2')
 
 fig.add_trace(go.Scatter(
     x=years,
@@ -135,4 +136,3 @@ st.plotly_chart(fig, use_container_width=True)
 
 # --- Footer ---
 st.caption("Built for NRI and domestic investors to analyze residential real estate with data-driven metrics. 🧮")
-
