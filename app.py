@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+import numpy_financial as npf
 from numpy_financial import irr
 
 st.set_page_config(page_title="NRI Investment Analyzer", layout="wide")
