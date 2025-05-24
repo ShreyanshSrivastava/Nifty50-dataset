@@ -113,17 +113,16 @@ fig.add_trace(go.Scatter(
 fig.update_layout(
     xaxis_title="Year",
     yaxis=dict(
-        title="Property Value (₹)",
-        titlefont=dict(color='blue'),
+        title=dict(text="Property Value (₹)", font=dict(color='blue')),
         tickfont=dict(color='blue'),
         side='left'
     ),
     yaxis2=dict(
-        title="Net Rent (₹)",
-        titlefont=dict(color='green'),
+        title=dict(text="Net Rent (₹)", font=dict(color='green')),
         tickfont=dict(color='green'),
         overlaying='y',
         side='right'
+    ),
     ),
     barmode='group',
     hovermode='x unified',
