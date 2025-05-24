@@ -253,3 +253,38 @@ st.dataframe(amort_df.style.format({
     "Principal Paid": "₹{:.2f}",
     "Balance": "₹{:.2f}"
 }), use_container_width=True)
+
+# --- Interest vs Principal Line Graph ---
+st.subheader("📉 Interest vs Principal Over Time")
+
+fig2 = go.Figure()
+
+fig2.add_trace(go.Scatter(
+    x=amort_df["Period"],
+    y=amort_df["Interest Paid"],
+    mode='lines+markers',
+    name="Interest Paid",
+    line=dict(color='red', width=2),
+    hovertemplate="Period %{x}: ₹%{y:,.0f}<extra></extra>"
+))
+
+fig2.add_trace(go.Scatter(
+    x=amort_df["Period"],
+    y=amort_df["Principal Paid"],
+    mode='lines+markers',
+    name="Principal Paid",
+    line=dict(color='blue', width=2),
+    hovertemplate="Period %{x}: ₹%{y:,.0f}<extra></extra>"
+))
+
+fig2.update_layout(
+    title="Loan Repayment Breakdown Over Time",
+    xaxis_title="Period",
+    yaxis_title="Amount (₹)",
+    hovermode='x unified',
+    template="plotly_white",
+    height=450,
+    legend=dict(y=0.95, x=0.01)
+)
+
+st.plotly_chart(fig2, use_container_width=True)
