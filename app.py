@@ -1,166 +1,118 @@
-# Full Streamlit App Code: Real Estate Investment Analyzer with Enhanced Metrics
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 
-st.set_page_config(layout="wide", page_title="NRI Investment Analyzer")
-st.title("🏘️ NRI Real Estate Investment Analyzer")
+st.set_page_config(layout="wide")
 
-# --- Input Section ---
-st.sidebar.header("🛠️ Property & Loan Configuration")
+st.title("🏠 NRI Real Estate Investment Analyzer")
 
-# Property inputs
-property_price = st.sidebar.number_input("Property Price (₹)", value=8500000, step=500000)
-rent_monthly = st.sidebar.number_input("Expected Monthly Rent (₹)", value=24000, step=1000)
-rent_escalation = st.sidebar.slider("Annual Rent Escalation (%)", 0.0, 10.0, 5.0)
-prop_appreciation = st.sidebar.slider("Annual Property Appreciation (%)", 0.0, 12.0, 6.0)
-horizon_years = st.sidebar.slider("Investment Horizon (Years)", 1, 20, 10)
+# Sidebar inputs
+st.sidebar.header("📋 Project & Financial Details")
+property_name = st.sidebar.text_input("Property Name", "Lodha Amara - 1 BHK")
+total_cost = st.sidebar.number_input("Total Property Cost (₹)", value=8500000, step=50000)
+loan_percentage = st.sidebar.slider("Loan as % of Total Cost", 0, 100, 60)
+tenure_years = st.sidebar.slider("Loan Tenure (Years)", 1, 30, 20)
+interest_rate = st.sidebar.slider("Interest Rate (% p.a.)", 1.0, 15.0, 8.6)
 
-# Loan inputs
-st.sidebar.markdown("---")
-loan_amt = st.sidebar.number_input("Loan Amount (₹)", value=3000000, step=100000)
-loan_interest_rate = st.sidebar.slider("Loan Interest Rate (%)", 5.0, 12.0, 8.6)
-loan_tenure_yrs = st.sidebar.slider("Loan Tenure (Years)", 1, 30, 20)
+payment_schedule_type = st.sidebar.selectbox("Payment Plan Type", ["Standard (10:20:30:40)", "Custom"])
 
-# Amortization view
-amortization_view = st.sidebar.radio("Amortization View", ["Annual", "Monthly"], index=0)
-
-# Payment Plan Details
-st.sidebar.markdown("---")
-st.sidebar.markdown("### Payment Plan Details")
-custom_schedule = st.sidebar.checkbox("Specify Custom Payment Schedule")
-
-payment_plan = []
-if custom_schedule:
-    num_tranches = st.sidebar.number_input("Number of Tranches", min_value=1, max_value=10, value=4)
-    for i in range(num_tranches):
-        pct = st.sidebar.number_input(f"Tranche {i+1} (% of Price)", min_value=1, max_value=100, value=25, key=f"pct_{i}")
-        timing = st.sidebar.number_input(f"Timing (months from now)", min_value=0, max_value=loan_tenure_yrs*12, value=i*6, key=f"time_{i}")
-        payment_plan.append((pct, timing))
+if payment_schedule_type == "Standard (10:20:30:40)":
+    schedule = [(10, 0), (20, 45), (30, 315), (40, 1000)]  # days from today
 else:
-    payment_plan = [(10, 0), (20, 1), (30, 9), (40, 36)]
-
-# --- Calculations ---
-
-# EMI calculation
-def calculate_emi(P, R, N):
-    r = R / (12 * 100)
-    emi = P * r * ((1 + r) ** N) / (((1 + r) ** N) - 1)
-    return emi
-
-emi = calculate_emi(loan_amt, loan_interest_rate, loan_tenure_yrs * 12)
-emi_rounded = round(emi)
-
-# Rent and appreciation calculations
-net_rent_annual = 0
-net_rent_total = 0
-rent_annual = rent_monthly * 12
-cashflows = [-property_price]
-
-for year in range(1, horizon_years + 1):
-    rent = rent_annual * ((1 + rent_escalation / 100) ** (year - 1))
-    net_rent_annual += rent
-    net_rent_total += rent
-    cashflows.append(rent)
-
-# Property appreciation
-final_property_value = property_price * ((1 + prop_appreciation / 100) ** horizon_years)
-
-# Total Outflow (Custom Payment Plan)
-payment_amounts = []
-total_outflow = 0
-
-for pct, months in payment_plan:
-    amt = (pct / 100) * property_price
-    total_outflow += amt
-    payment_amounts.append((months, amt))
-
-payment_amounts.sort()
-
-# Interest paid on loan
-interest_paid = (emi * loan_tenure_yrs * 12) - loan_amt
-net_profit = (final_property_value + net_rent_total) - (total_outflow + interest_paid)
-
-# IRR calculation
-def xirr(cashflows, dates):
-    from scipy.optimize import newton
-
-    def npv(rate):
-        return sum([cf / ((1 + rate) ** ((d - dates[0]).days / 365.0)) for cf, d in zip(cashflows, dates)])
-
-    try:
-        return newton(npv, 0.1)
-    except:
-        return 0.0
-
-irr_dates = [datetime.today().replace(day=1)]
-for y in range(1, horizon_years + 1):
-    irr_dates.append(datetime.today().replace(year=datetime.today().year + y))
-
-irr = xirr(cashflows + [final_property_value], irr_dates)
-
-# ROI
-roi = (net_profit / (total_outflow + interest_paid)) * 100
-
-# --- UI Output ---
-
-# --- Investment Summary with ROI ---
-st.subheader("📈 Investment Summary")
-
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Monthly EMI (₹)", f"{emi_rounded:,}")
-col2.metric("Gross Rental Yield (%)", f"{rent_annual / property_price * 100:.2f}")
-col3.metric("Net Rental Yield (%)", f"{net_rent_annual / property_price * 100:.2f}")
-col4.metric("Investment Horizon (yrs)", f"{horizon_years}")
-col5.metric("ROI (%)", f"{roi:.2f}")
-
-col6, col7, col8, col9 = st.columns(4)
-col6.metric("Estimated Property Value (₹)", f"{final_property_value:,.0f}")
-col7.metric("Total Net Rent Earned (₹)", f"{net_rent_total:,.0f}")
-col8.metric("Total Outflow (₹)", f"{(total_outflow + interest_paid):,.0f}")
-col9.metric("Net Profit (₹)", f"{net_profit:,.0f}")
-
-st.markdown(f"**Internal Rate of Return (IRR):** {irr * 100:.2f}%")
-
-# --- Loan Amortization Section ---
-st.subheader("💰 Loan Amortization Schedule")
-
-def amortization_schedule(P, R, tenure_yrs, view):
-    r = R / 12 / 100
-    N = tenure_yrs * 12
-    emi = calculate_emi(P, R, N)
-
+    st.sidebar.markdown("### Custom Payment Plan")
+    num_tranches = st.sidebar.number_input("Number of Tranches", 1, 10, 4)
     schedule = []
-    balance = P
+    for i in range(num_tranches):
+        percent = st.sidebar.number_input(f"Tranche {i+1} %", min_value=0, max_value=100, value=25, key=f"percent_{i}")
+        days = st.sidebar.number_input(f"Tranche {i+1} - Days from Today", min_value=0, value=i * 180, key=f"days_{i}")
+        schedule.append((percent, days))
 
-    for m in range(1, N + 1):
+expected_rent = st.sidebar.number_input("Expected Monthly Rent on Possession (₹)", value=24000, step=1000)
+appreciation_rate = st.sidebar.slider("Expected Annual Appreciation (%)", 0.0, 20.0, 6.0)
+
+# Calculations
+loan_amount = total_cost * loan_percentage / 100
+equity = total_cost - loan_amount
+emi = np.pmt(interest_rate / 1200, tenure_years * 12, -loan_amount)
+
+# Demand schedule
+today = datetime.today()
+demand_df = pd.DataFrame(schedule, columns=["%", "Days"])
+demand_df["₹"] = demand_df["%"] / 100 * total_cost
+demand_df["Date"] = demand_df["Days"].apply(lambda x: today + timedelta(days=int(x)))
+demand_df = demand_df.sort_values("Date").reset_index(drop=True)
+demand_df["Cumulative ₹"] = demand_df["₹"].cumsum()
+
+# Loan amortization
+def generate_amortization(loan, rate, tenure_years, freq="Monthly"):
+    schedule = []
+    periods = tenure_years * 12 if freq == "Monthly" else tenure_years
+    r = rate / 1200 if freq == "Monthly" else rate / 100
+    emi = np.pmt(r, periods, -loan)
+    balance = loan
+    for i in range(1, periods + 1):
         interest = balance * r
         principal = emi - interest
         balance -= principal
-        if view == "Monthly" or (view == "Annual" and m % 12 == 0):
-            period = m if view == "Monthly" else m // 12
-            year_interest = interest * 12 if view == "Annual" else interest
-            year_principal = principal * 12 if view == "Annual" else principal
-            schedule.append([period, year_interest, year_principal, balance])
+        schedule.append({"Period": i, "EMI": emi, "Interest": interest, "Principal": principal, "Balance": balance})
+    return pd.DataFrame(schedule)
 
-    return pd.DataFrame(schedule, columns=["Period", "Interest Paid", "Principal Paid", "Balance"])
+amort_view = st.radio("📅 View Amortization Schedule As:", ["Monthly", "Annual"])
+amort_df = generate_amortization(loan_amount, interest_rate, tenure_years, freq=amort_view)
+if amort_view == "Annual":
+    amort_df = amort_df.groupby(amort_df.index // 12).sum(numeric_only=True).reset_index(drop=True)
+    amort_df.index += 1
+    amort_df["Period"] = amort_df.index
 
-amort_df = amortization_schedule(loan_amt, loan_interest_rate, loan_tenure_yrs, amortization_view)
+# Rent and appreciation projections
+possession_date = demand_df["Date"].max()
+rent_years = tenure_years - ((possession_date - today).days // 365)
+rental_income = expected_rent * 12 * max(rent_years, 0)
+projected_value = total_cost * ((1 + appreciation_rate / 100) ** tenure_years)
+total_outflow = equity + (emi * tenure_years * 12)
+net_profit = projected_value + rental_income - total_outflow
+roi = (net_profit / total_outflow) * 100 if total_outflow else 0
 
-st.dataframe(amort_df.style.format({
-    "Interest Paid": "₹{:.2f}",
-    "Principal Paid": "₹{:.2f}",
-    "Balance": "₹{:.2f}"
-}), use_container_width=True)
+# Display Summary
+st.header("📊 Investment Summary")
+col1, col2, col3 = st.columns(3)
+col1.metric("Equity Invested (₹)", f"{equity:,.0f}")
+col2.metric("Loan Amount (₹)", f"{loan_amount:,.0f}")
+col3.metric("Monthly EMI (₹)", f"{emi:,.0f}")
 
-# --- Interest vs Principal Graph ---
-st.subheader("📉 Interest vs Principal Components Over Time")
+col4, col5, col6 = st.columns(3)
+col4.metric("Rental Income (10 yrs, ₹)", f"{rental_income:,.0f}")
+col5.metric("Property Value (10 yrs, ₹)", f"{projected_value:,.0f}")
+col6.metric("Net Profit (₹)", f"{net_profit:,.0f}")
 
-fig2 = go.Figure()
-fig2.add_trace(go.Scatter(x=amort_df["Period"], y=amort_df["Interest Paid"], name="Interest Paid", line=dict(color="red")))
-fig2.add_trace(go.Scatter(x=amort_df["Period"], y=amort_df["Principal Paid"], name="Principal Paid", line=dict(color="green")))
-fig2.update_layout(xaxis_title="Period", yaxis_title="Amount (₹)", height=400, template="plotly_white")
-st.plotly_chart(fig2, use_container_width=True)
+col7, col8, col9 = st.columns(3)
+col7.metric("Total Outflow (₹)", f"{total_outflow:,.0f}")
+col8.metric("ROI (%)", f"{roi:.2f}%")
+
+# Demand Table
+st.subheader("📅 Demand Schedule")
+st.dataframe(demand_df[["%", "₹", "Date", "Cumulative ₹"]])
+
+# Cashflow over years
+st.subheader("🧾 Annual Cashflow Table")
+cf_data = []
+for year in range(1, tenure_years + 1):
+    rent = expected_rent * 12 if year > (possession_date - today).days // 365 else 0
+    emi_outflow = emi * 12
+    net = rent - emi_outflow
+    cf_data.append({"Year": year, "Rental Income": rent, "EMI Outflow": emi_outflow, "Net Cashflow": net})
+cf_df = pd.DataFrame(cf_data)
+st.dataframe(cf_df)
+
+# Loan Amortization
+st.subheader("💳 Loan Amortization Schedule")
+st.dataframe(amort_df)
+
+# Principal vs Interest chart
+fig = go.Figure()
+fig.add_trace(go.Bar(x=amort_df["Period"], y=amort_df["Principal"], name="Principal", marker_color="green"))
+fig.add_trace(go.Bar(x=amort_df["Period"], y=amort_df["Interest"], name="Interest", marker_color="red"))
+fig.update_layout(title="EMI Split Over Time", xaxis_title="Period", yaxis_title="Amount (₹)", barmode='stack')
+st.plotly_chart(fig)
