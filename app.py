@@ -4,6 +4,9 @@ import pandas as pd
 from math import pow
 import plotly.graph_objects as go
 import numpy_financial as npf
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Real Estate Investment Analyzer", layout="centered")
 st.title("🏨 Real Estate Investment Analyzer")
@@ -288,3 +291,143 @@ fig2.update_layout(
 )
 
 st.plotly_chart(fig2, use_container_width=True)
+
+def convert_custom_payment_schedule(property_value, schedule_dict, possession_date):
+    """
+    Converts a dictionary like {"10%": "start", "30%": "6 months", "60%": "possession"}
+    into a list of cash outflows with actual dates.
+    """
+    payment_schedule = []
+    for pct_str, timing in schedule_dict.items():
+        percent = float(pct_str.replace('%', '')) / 100
+        amount = property_value * percent
+
+        if timing.lower() == "start":
+            date = datetime.today().date()
+        elif "month" in timing:
+            num_months = int(timing.split()[0])
+            date = datetime.today().date() + relativedelta(months=num_months)
+        elif timing.lower() == "possession":
+            date = possession_date
+        else:
+            continue
+
+        payment_schedule.append({"date": date, "amount": amount})
+
+    return sorted(payment_schedule, key=lambda x: x['date'])
+
+def build_staggered_loan_schedule(payment_schedule, annual_rate=0.086, tenure_years=20):
+    """
+    Based on payment schedule, determine the disbursed loan, build EMI schedules.
+    Assumes any payment beyond the first is loan financed.
+    """
+    first_payment_date = payment_schedule[0]['date']
+    first_payment_amount = payment_schedule[0]['amount']
+
+    drawdowns = []
+    loan_components = []
+    total_loan = 0
+    for i, payment in enumerate(payment_schedule):
+        if i == 0:
+            continue  # assume first payment is equity
+        loan_amount = payment['amount']
+        disbursal_date = payment['date']
+        total_loan += loan_amount
+        drawdowns.append({"date": disbursal_date, "amount": loan_amount})
+
+    emi_schedules = []
+    for drawdown in drawdowns:
+        start = drawdown['date']
+        amount = drawdown['amount']
+        r = annual_rate / 12
+        n = tenure_years * 12
+        emi = np.pmt(r, n, -amount)
+
+        for i in range(n):
+            payment_date = start + relativedelta(months=i)
+            emi_schedules.append({"date": payment_date, "emi": emi})
+
+    emi_df = pd.DataFrame(emi_schedules)
+    emi_df = emi_df.groupby('date').sum().reset_index()
+    return emi_df, pd.DataFrame(drawdowns), total_loan
+
+# --- IRR Integration ---
+def calculate_cashflows_for_irr(payment_schedule, emi_df, rent_start_date=None, rent_monthly=0):
+    """
+    Create net cashflow timeline: negative for outflows (equity + EMI), positive for rent (optional).
+    """
+    cashflow_dict = {}
+
+    # Add payment outflows (equity + loan portions)
+    for p in payment_schedule:
+        cashflow_dict[p['date']] = cashflow_dict.get(p['date'], 0) - p['amount']
+
+    # Add EMI outflows
+    for _, row in emi_df.iterrows():
+        date = row['date']
+        emi = row['emi']
+        cashflow_dict[date] = cashflow_dict.get(date, 0) - emi
+
+    # Add rental inflows
+    if rent_start_date and rent_monthly:
+        for i in range(240):
+            rent_date = rent_start_date + relativedelta(months=i)
+            cashflow_dict[rent_date] = cashflow_dict.get(rent_date, 0) + rent_monthly
+
+    # Convert to DataFrame
+    cashflow_df = pd.DataFrame(sorted(cashflow_dict.items()), columns=['date', 'net_cashflow'])
+    return cashflow_df
+
+# --- UI for new feature ---
+
+st.sidebar.subheader("🔄 Custom Payment Schedule")
+if st.sidebar.checkbox("Enable Custom Payment Schedule"):
+    property_value = st.sidebar.number_input("Property Value (₹)", min_value=1_00_000, step=50_000)
+    possession_date = st.sidebar.date_input("Possession Date")
+    rent_start_date = st.sidebar.date_input("Rental Start Date (Optional)", value=None)
+    rent_monthly = st.sidebar.number_input("Expected Monthly Rent (Optional)", min_value=0, step=1000)
+
+    st.sidebar.markdown("### Define Schedule")
+    with st.sidebar.form("schedule_form"):
+        schedule_input = st.text_area("Enter schedule (e.g., 10%: start, 30%: 6 months, 60%: possession)")
+        submit_schedule = st.form_submit_button("Apply Schedule")
+
+    if submit_schedule:
+        try:
+            # Parse input into dictionary
+            schedule_dict = {}
+            for line in schedule_input.split(','):
+                if ':' in line:
+                    key, val = line.strip().split(':')
+                    schedule_dict[key.strip()] = val.strip()
+
+            payment_schedule = convert_custom_payment_schedule(property_value, schedule_dict, possession_date)
+            emi_df, drawdown_df, total_loan = build_staggered_loan_schedule(payment_schedule)
+            cashflow_df = calculate_cashflows_for_irr(payment_schedule, emi_df, rent_start_date, rent_monthly)
+
+            # IRR Calculation
+            cashflows = cashflow_df['net_cashflow'].values
+            irr = np.irr(cashflows)
+
+            st.subheader("📊 Staggered Outflow Schedule")
+            st.dataframe(pd.DataFrame(payment_schedule))
+
+            st.subheader("💰 Loan Drawdown Schedule")
+            st.dataframe(drawdown_df)
+
+            st.subheader("📆 EMI Schedule from Drawdowns")
+            st.line_chart(emi_df.set_index('date'))
+
+            st.subheader("📈 Net Cashflow Timeline")
+            st.line_chart(cashflow_df.set_index('date'))
+
+            st.success(f"Total Loan Financed: ₹{int(total_loan):,}")
+            if irr is not None:
+                st.success(f"Estimated IRR: {irr*100:.2f}%")
+            else:
+                st.warning("IRR could not be calculated due to cashflow structure.")
+
+        except Exception as e:
+            st.error(f"Error parsing schedule: {e}")
+
+# End of New Add-on Code
