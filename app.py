@@ -31,6 +31,7 @@ else:
 
 expected_rent = st.sidebar.number_input("Expected Monthly Rent on Possession (₹)", value=24000, step=1000)
 appreciation_rate = st.sidebar.slider("Expected Annual Appreciation (%)", 0.0, 20.0, 6.0)
+holding_period_years = st.sidebar.slider("Holding Period (Years)", 1, 30, tenure_years)
 
 # Calculations
 loan_amount = total_cost * loan_percentage / 100
@@ -68,10 +69,10 @@ if amort_view == "Annual":
 
 # Rent and appreciation projections
 possession_date = demand_df["Date"].max()
-rent_years = tenure_years - ((possession_date - today).days // 365)
+rent_years = holding_period_years - ((possession_date - today).days // 365)
 rental_income = expected_rent * 12 * max(rent_years, 0)
-projected_value = total_cost * ((1 + appreciation_rate / 100) ** tenure_years)
-total_outflow = equity + (emi * tenure_years * 12)
+projected_value = total_cost * ((1 + appreciation_rate / 100) ** holding_period_years)
+total_outflow = equity + (emi * min(holding_period_years, tenure_years) * 12)
 net_profit = projected_value + rental_income - total_outflow
 roi = (net_profit / total_outflow) * 100 if total_outflow else 0
 
@@ -83,8 +84,8 @@ col2.metric("Loan Amount (₹)", f"{loan_amount:,.0f}")
 col3.metric("Monthly EMI (₹)", f"{emi:,.0f}")
 
 col4, col5, col6 = st.columns(3)
-col4.metric("Rental Income (10 yrs, ₹)", f"{rental_income:,.0f}")
-col5.metric("Property Value (10 yrs, ₹)", f"{projected_value:,.0f}")
+col4.metric("Rental Income (₹)", f"{rental_income:,.0f}")
+col5.metric("Property Value (₹)", f"{projected_value:,.0f}")
 col6.metric("Net Profit (₹)", f"{net_profit:,.0f}")
 
 col7, col8, col9 = st.columns(3)
@@ -98,9 +99,9 @@ st.dataframe(demand_df[["%", "₹", "Date", "Cumulative ₹"]])
 # Cashflow over years
 st.subheader("🧾 Annual Cashflow Table")
 cf_data = []
-for year in range(1, tenure_years + 1):
+for year in range(1, holding_period_years + 1):
     rent = expected_rent * 12 if year > (possession_date - today).days // 365 else 0
-    emi_outflow = emi * 12
+    emi_outflow = emi * 12 if year <= tenure_years else 0
     net = rent - emi_outflow
     cf_data.append({"Year": year, "Rental Income": rent, "EMI Outflow": emi_outflow, "Net Cashflow": net})
 cf_df = pd.DataFrame(cf_data)
@@ -116,3 +117,4 @@ fig.add_trace(go.Bar(x=amort_df["Period"], y=amort_df["Principal"], name="Princi
 fig.add_trace(go.Bar(x=amort_df["Period"], y=amort_df["Interest"], name="Interest", marker_color="red"))
 fig.update_layout(title="EMI Split Over Time", xaxis_title="Period", yaxis_title="Amount (₹)", barmode='stack')
 st.plotly_chart(fig)
+
