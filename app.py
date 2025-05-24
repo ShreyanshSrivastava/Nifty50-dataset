@@ -1,199 +1,119 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-from math import pow, ceil
-import numpy_financial as npf
+import numpy as np
 import plotly.graph_objects as go
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from numpy_financial import irr
 
-st.set_page_config(page_title="NRI Investment Analyzer - Under Construction Enhancements", layout="wide")
-st.title("🏘️ NRI Investment Analyzer (Under Construction with Custom Payments)")
+st.set_page_config(page_title="NRI Investment Analyzer", layout="wide")
+st.title("🏘️ NRI Investment Analyzer - Real Estate")
 
-st.markdown("""
-Analyze residential property investments with flexible payment plans and staggered loans for under-construction projects.
-""")
+st.sidebar.header("Property & Loan Details")
 
-# --- Inputs ---
-st.sidebar.header("Property Details")
-property_type = st.sidebar.selectbox("Property Type", ["Ready-to-move", "Under-construction"])
-property_price = st.sidebar.number_input("Property Price (₹)", value=8000000, step=50000)
+# --- Input Section ---
+property_value = st.sidebar.number_input("Property Value (₹)", value=8500000, step=50000)
+equity_contribution = st.sidebar.number_input("Equity Contribution (₹)", value=5000000, step=50000)
+loan_amount = property_value - equity_contribution
+interest_rate = st.sidebar.number_input("Loan Interest Rate (%)", value=8.6) / 100
+loan_tenure_years = st.sidebar.number_input("Loan Tenure (years)", value=20)
 
-if property_type == "Under-construction":
-    st.sidebar.markdown("### Custom Payment Schedule")
-    num_payments = st.sidebar.slider("Number of Payments", 2, 6, 4)
+st.sidebar.markdown("---")
 
-    payment_percents = []
-    payment_months = []
+# Custom Payment Plan
+st.sidebar.subheader("Under-Construction Payment Plan")
+payment_plan = []
+payment_tranches = st.sidebar.number_input("Number of Payment Tranches", value=4, min_value=1, max_value=10)
 
-    for i in range(num_payments):
-        p = st.sidebar.number_input(f"Payment {i+1} (%)", min_value=0, max_value=100, value=0, step=5, key=f"pct_{i}")
-        m = st.sidebar.number_input(f"Payment {i+1} Month (from start)", min_value=0, max_value=60, value=0, step=1, key=f"month_{i}")
-        payment_percents.append(p)
-        payment_months.append(m)
+for i in range(payment_tranches):
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        percent = st.number_input(f"Tranche {i+1} (%)", min_value=0.0, max_value=100.0, value=25.0, key=f"p_{i}")
+    with col2:
+        month = st.number_input(f"Month {i+1}", min_value=0, max_value=240, value=i * 6, key=f"m_{i}")
+    payment_plan.append({"month": month, "percent": percent})
 
-    if abs(sum(payment_percents) - 100) > 0.01:
-        st.sidebar.error("Total payment percentages must sum to 100%")
-    
-    construction_period_months = max(payment_months)
-else:
-    # Ready to move defaults
-    down_payment_pct = st.sidebar.slider("Down Payment (%)", 10, 100, 30)
-    construction_period_months = 0
+completion_month = st.sidebar.number_input("Construction Completion (Month)", value=24)
+rent_start = completion_month
+monthly_rent = st.sidebar.number_input("Expected Monthly Rent after Possession (₹)", value=24000)
+rent_growth = st.sidebar.number_input("Annual Rent Growth Rate (%)", value=5.0) / 100
 
-loan_interest_rate = st.sidebar.number_input("Loan Interest Rate (%)", value=8.5)
-loan_tenure_yrs = st.sidebar.slider("Loan Tenure (years)", 5, 30, 20)
-rent_monthly = st.sidebar.number_input("Expected Monthly Rent (₹)", value=25000, step=1000)
-annual_maintenance = st.sidebar.number_input("Annual Maintenance & Tax (₹)", value=30000)
-capital_appreciation = st.sidebar.slider("Expected Capital Appreciation (CAGR %)", 0, 15, 6)
-rental_growth = st.sidebar.slider("Expected Rental Growth (CAGR %)", 0, 15, 3)
-horizon_years = st.sidebar.slider("Investment Horizon (Years)", 1, 30, 10)
+sale_price = st.sidebar.number_input("Expected Sale Price (₹)", value=11000000)
+sale_month = st.sidebar.number_input("Expected Sale Month", value=120)
 
-# --- Calculations ---
-months_horizon = horizon_years * 12
+# --- Backend Calculations ---
+horizon_months = max(sale_month, max([p["month"] for p in payment_plan]) + 12)
+cashflow = np.zeros(horizon_months + 1)
 
-if property_type == "Under-construction":
-    # Calculate payment amounts by month
-    payment_amounts = [property_price * (pct / 100) for pct in payment_percents]
-    payment_schedule = list(zip(payment_months, payment_amounts))
+# Equity Payments
+for tranche in payment_plan:
+    amount = (tranche["percent"] / 100) * property_value
+    cashflow[tranche["month"]] -= amount
 
-    # Sort payments by month ascending (just in case)
-    payment_schedule = sorted(payment_schedule, key=lambda x: x[0])
+# Loan Disbursements aligned to payment tranches (if equity insufficient)
+emi_schedule = []
+remaining_equity = equity_contribution
+for tranche in payment_plan:
+    amount = (tranche["percent"] / 100) * property_value
+    if remaining_equity >= amount:
+        remaining_equity -= amount
+    else:
+        loan_part = amount - remaining_equity
+        remaining_equity = 0
+        disbursement_month = tranche["month"]
+        emi = np.pmt(interest_rate / 12, loan_tenure_years * 12, -loan_part)
+        emi_schedule.append({"month": disbursement_month, "emi": emi, "principal": loan_part})
 
-    # Loan disbursements = payments (loan funds paid out as needed)
-    # Assume loan is taken as needed per payment, EMI tenure fixed for loan_tenure_yrs from disbursement month
-    monthly_interest_rate = loan_interest_rate / 12 / 100
+# Add EMIs to cashflow
+for emi_entry in emi_schedule:
+    start = emi_entry["month"] + 1
+    for m in range(start, start + loan_tenure_years * 12):
+        if m >= len(cashflow):
+            break
+        cashflow[m] -= emi_entry["emi"]
 
-    # For each loan tranche, calculate EMI and generate EMI schedule over horizon months
-    emi_schedules = np.zeros(months_horizon)
-    loan_disbursed_total = 0
+# Add Rent from completion
+for m in range(rent_start, len(cashflow)):
+    year_index = (m - rent_start) // 12
+    rent = monthly_rent * ((1 + rent_growth) ** year_index)
+    cashflow[m] += rent
 
-    for pay_month, pay_amt in payment_schedule:
-        if pay_amt == 0:
-            continue
-        loan_disbursed_total += pay_amt
-        tenure_months = loan_tenure_yrs * 12
-        emi = pay_amt * monthly_interest_rate * pow(1 + monthly_interest_rate, tenure_months) / (pow(1 + monthly_interest_rate, tenure_months) - 1)
+# Sale inflow
+if sale_month < len(cashflow):
+    cashflow[sale_month] += sale_price
 
-        # EMI starts at pay_month (0-based indexing)
-        for m in range(pay_month, min(pay_month + tenure_months, months_horizon)):
-            emi_schedules[m] += emi
+# IRR
+investment_irr = irr(cashflow)
 
-    # Payments are outflows at payment months
-    monthly_payments = np.zeros(months_horizon)
-    for pay_month, pay_amt in payment_schedule:
-        if pay_amt == 0:
-            continue
-        if pay_month < months_horizon:
-            monthly_payments[pay_month] += pay_amt
-
-    # Rent starts only after construction period ends
-    monthly_rent_schedule = np.zeros(months_horizon)
-    current_rent = rent_monthly
-    for m in range(construction_period_months, months_horizon):
-        # Apply rental growth annually (every 12 months)
-        years_passed = (m - construction_period_months) // 12
-        rent_this_month = current_rent * pow(1 + rental_growth / 100, years_passed)
-        monthly_rent_schedule[m] = rent_this_month
-
-    # Maintenance tax assumed yearly, distribute monthly for cashflow
-    monthly_maintenance = annual_maintenance / 12
-
-    # Monthly net rent after maintenance (only months after construction)
-    monthly_net_rent = np.array([max(0, r - monthly_maintenance) for r in monthly_rent_schedule])
-
-    # Property value growth yearly (for final sale)
-    property_value_by_year = [property_price * pow(1 + capital_appreciation / 100, y) for y in range(1, horizon_years + 1)]
-
-    # Total outflow: payments + EMIs
-    total_outflows = np.sum(monthly_payments) + np.sum(emi_schedules)
-    # Total inflow: rent + final sale value (at end of horizon)
-    total_inflows = np.sum(monthly_net_rent) + property_value_by_year[-1]
-
-    net_profit = total_inflows - total_outflows
-
-    # Construct annual cashflows for IRR (year 0 is initial outflow of downpayment which is first payment)
-    # For IRR, each year cashflow = inflows - outflows
-    annual_cashflows = []
-    for y in range(horizon_years + 1):
-        start_month = y * 12
-        end_month = min(start_month + 12, months_horizon)
-        inflows = np.sum(monthly_net_rent[start_month:end_month])
-        outflows = np.sum(monthly_payments[start_month:end_month]) + np.sum(emi_schedules[start_month:end_month])
-        if y == 0:
-            # Include initial payment(s) at month 0 if any
-            outflows += 0  # Already counted in monthly_payments
-        if y == horizon_years:
-            inflows += property_value_by_year[-1]
-        annual_cashflows.append(inflows - outflows)
-    # Note: First year cashflow negative because payments > inflows
-
-else:
-    # Ready-to-move logic (simple)
-    down_payment_amt = property_price * down_payment_pct / 100
-    loan_amt = property_price - down_payment_amt
-    monthly_interest_rate = loan_interest_rate / 12 / 100
-    months = loan_tenure_yrs * 12
-
-    emi = loan_amt * monthly_interest_rate * pow(1 + monthly_interest_rate, months) / (pow(1 + monthly_interest_rate, months) - 1)
-    emi_rounded = round(emi)
-
-    total_outflow = down_payment_amt
-    rent_annual = rent_monthly * 12
-    net_rent_annual = rent_annual - annual_maintenance
-
-    net_rent_vals = []
-    current_rent = net_rent_annual
-    for i in range(horizon_years):
-        net_rent_vals.append(current_rent)
-        current_rent *= (1 + rental_growth / 100)
-
-    net_rent_total = sum(net_rent_vals)
-
-    property_vals = [property_price * pow(1 + capital_appreciation / 100, i + 1) for i in range(horizon_years)]
-    final_property_value = property_vals[-1]
-
-    total_inflow = net_rent_total + final_property_value
-
-    interest_paid = emi * min(horizon_years, loan_tenure_yrs) * 12 - loan_amt
-    net_profit = total_inflow - total_outflow - interest_paid
-
-    cashflows = [-down_payment_amt]
-    for rent in net_rent_vals[:-1]:
-        cashflows.append(rent)
-    cashflows.append(net_rent_vals[-1] + final_property_value)
-    annual_cashflows = cashflows
-
-# IRR Calculation
-try:
-    irr = npf.irr(annual_cashflows)
-except:
-    irr = None
-
-# --- Dashboard ---
+# --- Summary Metrics ---
 
 st.subheader("📈 Investment Summary")
+total_outflow = -sum([cf for cf in cashflow if cf < 0])
+total_inflow = sum([cf for cf in cashflow if cf > 0])
+total_profit = total_inflow - total_outflow
+interest_paid = sum([e["emi"] * loan_tenure_years * 12 for e in emi_schedule]) - sum([e["principal"] for e in emi_schedule])
+final_property_value = sale_price
+net_rent_total = sum([cf for cf in cashflow if cf > 0 and cf != sale_price])
+horizon_years = horizon_months // 12
 
-if property_type == "Under-construction":
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Payments (₹)", f"{np.sum(monthly_payments):,.0f}")
-    col2.metric("Total EMIs Paid (₹)", f"{np.sum(emi_schedules):,.0f}")
-    col3.metric("Total Outflows (₹)", f"{total_outflows:,.0f}")
-    col4.metric("Net Profit (₹)", f"{net_profit:,.0f}")
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Investment (₹)", f"{total_outflow:,.0f}")
+col2.metric("Total Profit (₹)", f"{total_profit:,.0f}")
+col3.metric("Gross Return (%)", f"{(total_profit / total_outflow * 100):.2f}")
+col4.metric("Holding Period (years)", f"{horizon_years}")
 
-    col5, col6, col7, col8 = st.columns(4)
-    col5.metric("Investment Horizon (yrs)", horizon_years)
-    col6.metric("Final Property Value (₹)", f"{property_value_by_year[-1]:,.0f}")
-    total_rent_earned = np.sum(monthly_net_rent)
-    col7.metric("Total Net Rent Earned (₹)", f"{total_rent_earned:,.0f}")
-    if irr is not None:
-        col8.metric("Internal Rate of Return (IRR %)", f"{irr*100:.2f}%")
-    else:
-        col8.metric("Internal Rate of Return (IRR %)", "N/A")
+col5, col6, col7, col8 = st.columns(4)
+col5.metric("Total Interest Paid (₹)", f"{interest_paid:,.0f}")
+col6.metric("Final Property Value (₹)", f"{final_property_value:,.0f}")
+col7.metric("Net Rent Income (₹)", f"{net_rent_total:,.0f}")
+col8.metric("IRR (%)", f"{investment_irr * 100:.2f}" if investment_irr is not None else "N/A")
 
-else:
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Monthly EMI (₹)", f"{emi_rounded:,}")
-    col2.metric("Gross Rental Yield (%)", f"{rent_annual / property_price * 100:.2f}")
-    col3.metric("Net Rental Yield (%)", f"{net_rent_annual / property_price * 100:.2f}")
-    col4.metric(f"Investment Horizon (yrs)", f"{horizon_years}")
-
-    col5, col6,
+# --- Plotly Visualization ---
+st.subheader("📊 Cashflow Overview")
+annual_cashflows = [sum(cashflow[i:i+12]) for i in range(0, len(cashflow), 12)]
+annual_years = list(range(len(annual_cashflows)))
+fig = go.Figure()
+fig.add_trace(go.Bar(name="Annual Net Rent", x=annual_years, y=[max(cf, 0) for cf in annual_cashflows]))
+fig.add_trace(go.Bar(name="Annual Outflows (EMI+Payments)", x=annual_years, y=[-min(cf, 0) for cf in annual_cashflows]))
+fig.update_layout(barmode='relative', xaxis_title="Year", yaxis_title="Net Cashflow (₹)")
+st.plotly_chart(fig, use_container_width=True)
