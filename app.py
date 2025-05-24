@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import numpy_financial as npf
 
 st.set_page_config(layout="wide")
 
@@ -36,7 +37,7 @@ holding_period_years = st.sidebar.slider("Holding Period (Years)", 1, 30, tenure
 # Calculations
 loan_amount = total_cost * loan_percentage / 100
 equity = total_cost - loan_amount
-emi = np.pmt(interest_rate / 1200, tenure_years * 12, -loan_amount)
+emi = npf.pmt(interest_rate / 1200, tenure_years * 12, -loan_amount)
 
 # Demand schedule
 today = datetime.today()
