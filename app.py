@@ -5,8 +5,8 @@ from math import pow
 import plotly.graph_objects as go
 import numpy_financial as npf
 
-st.set_page_config(page_title="NRI Investment Analyzer", layout="centered")
-st.title("🏨 NRI Investment Analyzer")
+st.set_page_config(page_title="Real Estate Investment Analyzer", layout="centered")
+st.title("🏨 Real Estate Investment Analyzer")
 
 st.markdown("""
 This tool helps you analyze residential property investments — for both ready-to-move and under-construction projects.
@@ -188,7 +188,8 @@ fig.update_layout(
         tickfont=dict(color='green'),
         overlaying='y',
         side='right',
-        showgrid=False
+        showgrid=False,
+        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.1]
     ),
     barmode='group',
     hovermode='x unified',
