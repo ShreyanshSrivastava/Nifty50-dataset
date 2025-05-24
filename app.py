@@ -162,18 +162,6 @@ fig.add_trace(go.Scatter(
     hovertemplate="Year %{x}: ₹%{y:,.0f}<extra></extra>"
 ))
 
-# Show disbursement as bars at corresponding years (rounded)
-for yr, amt in disbursement_schedule:
-    fig.add_trace(go.Bar(
-        x=[int(round(yr)) + 1],
-        y=[amt],
-        name="Loan Disbursement",
-        marker_color='orange',
-        opacity=0.6,
-        yaxis="y",
-        hovertemplate=f"Disbursed: ₹{amt:,.0f} in Year {int(round(yr)) + 1}<extra></extra>"
-    ))
-
 fig.update_layout(
     title="Investment Cashflow & Property Value Over Time",
     xaxis_title="Year",
