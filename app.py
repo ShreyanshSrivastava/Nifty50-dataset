@@ -111,7 +111,7 @@ fig.update_layout(
         showgrid=False
     ),
     yaxis=dict(
-        title=dict(text="Property Value (₹)", font=dict(color='blue')),
+        title=dict(text="Property Value (₹)", font=dict(color='white')),
         tickfont=dict(color='white'),
         side='left',
         showgrid=False
