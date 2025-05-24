@@ -1,4 +1,3 @@
-import streamlit as st
 import numpy as np
 import pandas as pd
 from math import pow
@@ -28,6 +27,7 @@ capital_appreciation = st.sidebar.slider("Expected Capital Appreciation (CAGR %)
 rental_growth = st.sidebar.slider("Expected Rental Growth (CAGR %)", 0, 15, 3)
 horizon_years = st.sidebar.slider("Investment Horizon (Years)", 1, 30, 10)
 
+# Additional fields for under-construction properties
 if property_type == "Under-construction":
     st.sidebar.markdown("---")
     st.sidebar.subheader("Under-construction Settings")
@@ -41,13 +41,12 @@ if property_type == "Under-construction":
     )
 
     # Parse the percentages and validate sum to 100%
-    payment_splits = []
     try:
         payment_splits = [float(x.strip()) for x in payment_schedule_str.split(",")]
-    except Exception:
+    except:
         st.sidebar.error("Invalid payment split input. Use comma-separated numbers.")
 
-    if payment_splits and abs(sum(payment_splits) - 100) > 0.01:
+    if abs(sum(payment_splits) - 100) > 0.01:
         st.sidebar.warning("Payment splits should sum to 100%. Please adjust.")
 
     # Timing input (in months) for each tranche
@@ -56,13 +55,12 @@ if property_type == "Under-construction":
         "Enter payment timings in months (comma separated)", ",".join(str(x) for x in timing_default[:len(payment_splits)])
     )
 
-    payment_timing = []
     try:
         payment_timing = [int(x.strip()) for x in payment_timing_str.split(",")]
-    except Exception:
+    except:
         st.sidebar.error("Invalid payment timing input. Use comma-separated integers (months).")
 
-    if payment_timing and len(payment_timing) != len(payment_splits):
+    if len(payment_timing) != len(payment_splits):
         st.sidebar.warning("Number of timings must equal number of payment splits.")
 
 else:
@@ -81,21 +79,17 @@ emi = npf.pmt(monthly_interest_rate, months, -loan_amt)
 emi_rounded = round(emi)
 
 # Disbursement logic: use user payment_splits and payment_timing if under construction
-disbursement_schedule = []
-if property_type == "Under-construction" and payment_splits and payment_timing and len(payment_splits) == len(payment_timing):
+if property_type == "Under-construction":
+    disbursement_schedule = []
     for pct, month in zip(payment_splits, payment_timing):
-        # convert months to years for timeline
-        disbursement_schedule.append((month / 12, loan_amt * (pct / 100)))
+        disbursement_schedule.append((month / 12, loan_amt * (pct / 100)))  # convert months to years for timeline
 else:
-    # For ready-to-move or fallback, assume full loan at time 0
-    disbursement_schedule = [(0, loan_amt)]
+    disbursement_schedule = []
 
-# Adjust cashflows and outflows example (fill with your variable names)
-total_outflow = down_payment_amt  # start with down payment
+# Adjust cashflows and outflows
+total_outflow = down_payment_amt
 rent_annual = rent_monthly * 12
 net_rent_annual = rent_annual - annual_maintenance
-
-# You can now use disbursement_schedule for further cashflow modeling, e.g. discounting, etc.
 
 # Calculate rent with growth each year
 net_rent_vals = []
