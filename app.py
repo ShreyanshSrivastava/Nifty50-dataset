@@ -106,18 +106,23 @@ fig.add_trace(go.Scatter(
 ))
 
 fig.update_layout(
-    xaxis_title="Year",
+    xaxis=dict(
+        title="Year",
+        showgrid=False
+    ),
     yaxis=dict(
         title=dict(text="Property Value (₹)", font=dict(color='blue')),
         tickfont=dict(color='blue'),
-        side='left'
+        side='left',
+        showgrid=False
     ),
     yaxis2=dict(
         title=dict(text="Net Rent (₹)", font=dict(color='green')),
         tickfont=dict(color='green'),
         overlaying='y',
         side='right',
-        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*2.5]
+        showgrid=False,
+        range=[min(net_rent_vals)*0.9, max(net_rent_vals)*1.75]
     ),
     hovermode='x unified',
     height=500,
