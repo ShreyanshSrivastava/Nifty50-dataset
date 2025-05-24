@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from math import pow
 import plotly.graph_objects as go
+import numpy_financial as npf
 
 st.set_page_config(page_title="NRI Investment Analyzer", layout="centered")
 st.title("🏘️ NRI Investment Analyzer")
@@ -62,7 +63,7 @@ cashflows = [-down_payment_amt]
 for rent in net_rent_vals[:-1]:
     cashflows.append(rent)
 cashflows.append(net_rent_vals[-1] + final_property_value)
-irr = np.irr(cashflows)
+irr = npf.irr(cashflows)
 
 # --- Enhanced Dashboard Output ---
 
