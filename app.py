@@ -1,82 +1,81 @@
 import streamlit as st
-import numpy_financial as npf
+import numpy as np
 import pandas as pd
+from datetime import datetime
+from math import pow
+import matplotlib.pyplot as plt
+from io import BytesIO
 
-st.set_page_config(page_title="NRI Investment Analyzer", layout="wide")
-st.title("🇮🇳 NRI Real Estate Investment Analyzer")
+st.set_page_config(page_title="NRI Investment Analyzer", layout="centered")
+st.title("🏘️ NRI Investment Analyzer")
 
-# --- Sidebar Inputs ---
-st.sidebar.header("Property & Loan Details")
-property_value = st.sidebar.number_input("Property Value (INR)", value=12000000, step=100000)
-loan_amount = st.sidebar.number_input("Loan Amount (INR)", value=8000000, step=100000)
-interest_rate = st.sidebar.slider("Interest Rate (%)", min_value=5.0, max_value=12.0, value=8.6) / 100
-loan_term = st.sidebar.slider("Loan Tenure (Years)", 5, 30, 20)
+st.markdown("""
+This tool helps you analyze residential property investments — for both ready-to-move and under-construction projects.
+""")
 
-st.sidebar.header("Rental & Growth")
-monthly_rent = st.sidebar.number_input("Starting Rent (INR/month)", value=30000, step=1000)
-rent_escalation = st.sidebar.slider("Annual Rent Escalation (%)", 0.0, 10.0, 5.0) / 100
-appreciation = st.sidebar.slider("Property Appreciation (%)", 0.0, 15.0, 6.0) / 100
-maintenance = st.sidebar.number_input("Monthly Maintenance (INR)", value=5000, step=500)
-
-st.sidebar.header("Tax & FX")
-tax_bracket = st.sidebar.slider("Tax Bracket (%)", 0, 40, 30) / 100
-usd_inr = st.sidebar.number_input("USD/INR Exchange Rate", value=83.0)
-cap_gains_tax = st.sidebar.slider("Capital Gains Tax (%)", 0, 30, 20) / 100
+# --- Inputs ---
+st.sidebar.header("Property Details")
+property_type = st.sidebar.selectbox("Property Type", ["Ready-to-move", "Under-construction"])
+property_price = st.sidebar.number_input("Property Price (₹)", value=8000000, step=50000)
+down_payment_pct = st.sidebar.slider("Down Payment (%)", 10, 100, 30)
+loan_interest_rate = st.sidebar.number_input("Loan Interest Rate (%)", value=8.5)
+loan_tenure_yrs = st.sidebar.slider("Loan Tenure (years)", 5, 30, 20)
+rent_monthly = st.sidebar.number_input("Expected Monthly Rent (₹)", value=25000, step=1000)
+annual_maintenance = st.sidebar.number_input("Annual Maintenance & Tax (₹)", value=30000)
+capital_appreciation = st.sidebar.slider("Expected Capital Appreciation (CAGR %)", 0, 15, 6)
+horizon_years = st.sidebar.slider("Investment Horizon (Years)", 1, 30, 10)
 
 # --- Calculations ---
-months = loan_term * 12
-monthly_interest = interest_rate / 12
-emi = loan_amount * monthly_interest * ((1 + monthly_interest) ** months) / (((1 + monthly_interest) ** months) - 1)
+down_payment_amt = property_price * down_payment_pct / 100
+loan_amt = property_price - down_payment_amt
+monthly_interest_rate = loan_interest_rate / 12 / 100
+months = loan_tenure_yrs * 12
+emi = loan_amt * monthly_interest_rate * pow(1 + monthly_interest_rate, months) / (pow(1 + monthly_interest_rate, months) - 1)
+emi_rounded = round(emi)
 
-# Yearly projections
-years = loan_term
-df = pd.DataFrame(index=range(1, years + 1))
-df['Year'] = df.index
-df['Annual EMI'] = emi * 12
-df['Annual Rent'] = [monthly_rent * 12 * ((1 + rent_escalation) ** (i)) for i in range(years)]
-df['Maintenance'] = maintenance * 12
-df['Net Cashflow'] = df['Annual Rent'] - df['Annual EMI'] - df['Maintenance']
-df['Tax Savings'] = df['Annual EMI'] * tax_bracket
+total_outflow = down_payment_amt
+rent_annual = rent_monthly * 12
+net_rent_annual = rent_annual - annual_maintenance
+net_rent_total = net_rent_annual * horizon_years
 
-df['Net Benefit'] = df['Net Cashflow'] + df['Tax Savings']
-df['Property Value'] = [property_value * ((1 + appreciation) ** i) for i in range(years)]
+# Estimate property value after holding period
+final_property_value = property_price * pow(1 + capital_appreciation / 100, horizon_years)
+total_inflow = net_rent_total + final_property_value
 
-df['Net Benefit (USD)'] = df['Net Benefit'] / usd_inr
-df['Property Value (USD)'] = df['Property Value'] / usd_inr
+# Approximate interest paid
+interest_paid = emi * min(horizon_years, loan_tenure_yrs) * 12 - loan_amt
+net_profit = total_inflow - total_outflow - interest_paid
 
-# IRR Calculation
-initial_outflow = property_value - loan_amount
-cashflows = [-initial_outflow] + df['Net Benefit'].tolist()
-irr = npf.irr(cashflows)
+# IRR Calculation using cash flows
+cashflows = [-down_payment_amt]
+for i in range(1, horizon_years + 1):
+    cashflows.append(net_rent_annual)
+cashflows[-1] += final_property_value
+irr = np.irr(cashflows)
 
-# Sale details
-df['Cumulative Net Benefit'] = df['Net Benefit'].cumsum()
-sale_price = df['Property Value'].iloc[-1]
-capital_gain = sale_price - property_value
-tax_on_sale = capital_gain * cap_gains_tax
-net_sale_proceeds_usd = (sale_price - tax_on_sale) / usd_inr
+# --- Output Display ---
+st.subheader("📈 Investment Summary")
+st.markdown(f"**Monthly EMI:** ₹{emi_rounded:,}")
+st.markdown(f"**Gross Rental Yield:** {rent_annual / property_price * 100:.2f}%")
+st.markdown(f"**Net Rental Yield:** {net_rent_annual / property_price * 100:.2f}%")
+st.markdown(f"**Estimated Property Value after {horizon_years} years:** ₹{final_property_value:,.0f}")
+st.markdown(f"**Total Net Rent Earned:** ₹{net_rent_total:,.0f}")
+st.markdown(f"**Total Outflow:** ₹{(total_outflow + interest_paid):,.0f}")
+st.markdown(f"**Total Inflow:** ₹{total_inflow:,.0f}")
+st.markdown(f"**Net Profit:** ₹{net_profit:,.0f}")
+st.markdown(f"**IRR:** {irr * 100:.2f}%")
 
-# --- Display ---
-st.subheader("📊 Investment Summary")
-st.dataframe(df.style.format({
-    'Annual EMI': '₹{:,.0f}',
-    'Annual Rent': '₹{:,.0f}',
-    'Maintenance': '₹{:,.0f}',
-    'Net Cashflow': '₹{:,.0f}',
-    'Tax Savings': '₹{:,.0f}',
-    'Net Benefit': '₹{:,.0f}',
-    'Property Value': '₹{:,.0f}',
-    'Net Benefit (USD)': '${:,.0f}',
-    'Property Value (USD)': '${:,.0f}'
-}))
+# --- Graphs ---
+st.subheader("📊 Cashflow Projection")
+years = list(range(1, horizon_years + 1))
+cashflow_vals = [net_rent_annual] * (horizon_years - 1) + [net_rent_annual + final_property_value]
 
-st.markdown(f"### 💡 Internal Rate of Return (IRR): **{irr * 100:.2f}%**")
-st.markdown(f"### 💸 Net USD Sale Proceeds (post-tax): **${net_sale_proceeds_usd:,.0f}**")
+fig, ax = plt.subplots()
+ax.bar(years, cashflow_vals, color='green')
+ax.set_xlabel("Year")
+ax.set_ylabel("Cashflow (₹)")
+ax.set_title("Annual Cashflow including Final Exit")
+st.pyplot(fig)
 
-# --- Download ---
-st.download_button(
-    label="Download Results as CSV",
-    data=df.to_csv(index=False).encode('utf-8'),
-    file_name='nri_investment_analysis.csv',
-    mime='text/csv'
-)
+# --- Footer ---
+st.caption("Built for NRI and domestic investors to analyze residential real estate with data-driven metrics. 🧮")
